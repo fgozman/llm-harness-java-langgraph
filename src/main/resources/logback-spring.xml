@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging setup (Logback, loaded by Spring Boot because of the "-spring" suffix).
+
+  - FILE: every log line of the application goes to a rolling log file.
+          It is wrapped in an AsyncAppender: the application thread only puts the event
+          into an in-memory queue and continues; a background thread writes it to disk.
+          That thread is one long-lived platform (daemon) thread created by Logback itself; unlike the
+          rest of the application it cannot be configured to be a virtual thread.
+  - CONSOLE: only INFO and above, written synchronously. The console is also used for the
+          human approval prompts, and synchronous writing keeps log lines and prompts in order.
+
+  Log levels per package are configured in application.yml (logging.level.*).
+-->
+<configuration>
+
+    <!-- Values from application.yml, with defaults when they are not set. -->
+    <springProperty scope="context" name="LOG_DIR" source="organizer.logging.directory" defaultValue="logs"/>
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="file-organizer-agent"/>
+
+    <!-- Date, level, thread, short logger name, message. The thread shows which part of the run logged. -->
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+    <property name="CONSOLE_PATTERN"
+              value="%d{HH:mm:ss.SSS} %-5level %logger{0} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+        <encoder>
+            <pattern>${CONSOLE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- New file every day or when it reaches 10 MB; old files are compressed and deleted after 14 days. -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/${APP_NAME}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/${APP_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>14</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <!-- Number of log events that can wait in memory before being written. -->
+        <queueSize>1024</queueSize>
+        <!-- 0 = never drop events. By default Logback drops DEBUG/INFO when the queue is 80% full. -->
+        <discardingThreshold>0</discardingThreshold>
+        <!-- Caller data (class/line of the log call) is expensive to collect and not used in the pattern. -->
+        <includeCallerData>false</includeCallerData>
+        <!-- On shutdown, wait up to 2 seconds for queued events to be written. -->
+        <maxFlushTime>2000</maxFlushTime>
+        <appender-ref ref="FILE"/>
+    </appender>
+
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+    </root>
+
+</configuration>

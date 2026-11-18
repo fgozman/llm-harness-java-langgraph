@@ -1,0 +1,7 @@
+target/
+demo-inbox/
+logs/
+data/
+.idea/
+.DS_Store
+

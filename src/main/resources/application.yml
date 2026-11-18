@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: file-organizer-agent
+  main:
+    banner-mode: off
+  threads:
+    virtual:
+      # Spring's own executors (@Async, @Scheduled) use virtual threads. None are used today; the graph
+      # and the model's HTTP client are switched to virtual threads in code (OrganizerAgent, OrganizerConfiguration).
+      enabled: true
+
+organizer:
+  # Folder that will be organized. Override with --organizer.target-folder=/some/path
+  target-folder: ./demo-inbox
+  # Setup only (not part of the agent): write demo files into the target folder before organizing it.
+  # Enable with --organizer.generate-demo-files=true. Existing files are never overwritten.
+  generate-demo-files: false
+  # Instead of organizing, undo the last run on the target folder (asks for confirmation first).
+  undo-last-run: false
+  # The application's own files: run locks, change journals (for undo), backups of overwritten files.
+  # Access is restricted to the current user.
+  data-directory: ./data
+  # Number of characters the read_file tool returns per file (also limits what is sent to the LLM).
+  max-content-characters: 4000
+  # Maximum number of files list_files returns; files beyond this limit are left untouched.
+  max-files: 100
+  agent:
+    # The run stops after this many model calls (protects against endless loops and cost).
+    max-model-calls: 50
+    # The run stops when the model has used this many tokens (input + output).
+    max-tokens-per-run: 500000
+  checkpoints:
+    # Save the graph state in SQLite after every step. If the application crashes, the next start
+    # on the same folder offers to continue the interrupted run. When false, the state is kept in memory only.
+    enabled: true
+    database: ./data/organizer-checkpoints.db
+  logging:
+    # Folder of the log file (logs/file-organizer-agent.log). Relative paths start at the working directory.
+    directory: logs
+  llm:
+    # When enabled, a Claude (Anthropic) model drives the file tools.
+    # When disabled, an offline keyword model drives them instead.
+    # When enabled, an API key is required: the application does not start without it.
+    enabled: false
+    api-key: ${ANTHROPIC_API_KEY:}
+    base-url: https://api.anthropic.com/v1
+    model-name: claude-sonnet-4-5
+    # Maximum time for one model call, and how often a failed call is retried.
+    timeout: 60s
+    max-retries: 2
+    # Maximum length of one model answer (tool calls included).
+    max-tokens: 4096
+    # OpenAI configuration, no longer used.
+    # api-key: ${OPENAI_API_KEY:}
+    # base-url: https://api.openai.com/v1
+    # model-name: gpt-4o-mini
+
+logging:
+  # Appenders (console + async rolling file) are defined in logback-spring.xml.
+  level:
+    root: warn
+    # DEBUG goes to the log file only; the console shows INFO and above.
+    com.example.organizer: debug
